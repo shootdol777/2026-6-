@@ -1,0 +1,477 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>6학년 축구 리그전 현황판 (남·여 통합/분리)</title>
+  <script src="https://cdn.tailwindcss.com"></script>
+  <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
+  <style>
+    @import url('https://fonts.googleapis.com/css2?family=Pretendard:wght@400;600;700;800;900&display=swap');
+    body { font-family: 'Pretendard', sans-serif; }
+  </style>
+</head>
+<body class="bg-slate-100 text-slate-800 min-h-screen p-3 md:p-6">
+  <div class="max-w-4xl mx-auto space-y-6">
+
+    <!-- 헤더 -->
+    <header class="bg-gradient-to-r from-emerald-700 via-teal-700 to-sky-800 text-white p-6 rounded-2xl shadow-lg relative overflow-hidden">
+      <div class="flex flex-col md:flex-row md:items-center justify-between gap-4">
+        <div>
+          <div class="inline-flex items-center gap-2 bg-emerald-900/60 text-emerald-200 text-xs font-bold px-3 py-1 rounded-full mb-2 border border-emerald-400/30">
+            <i class="fa-solid fa-futbol"></i> 6학년 축구 리그전 • 남·여 2경기 합산제
+          </div>
+          <h1 class="text-2xl md:text-3xl font-black tracking-tight">🏆 학급 축구 리그전 전광판</h1>
+          <p class="text-xs md:text-sm text-emerald-100/90 mt-1">
+            승리 2점 · 무승부 1점 · 패배 0점 <span class="bg-amber-400 text-slate-900 font-extrabold px-1.5 py-0.5 rounded ml-1 text-xs">매치당 최대 4점</span>
+          </p>
+        </div>
+        <div class="flex items-center gap-2">
+          <button id="refreshBtn" onclick="loadSheetData()" class="flex items-center gap-2 bg-white/20 hover:bg-white/30 text-white text-xs font-bold px-3.5 py-2 rounded-xl backdrop-blur transition border border-white/20 active:scale-95">
+            <i id="syncIcon" class="fa-solid fa-rotate"></i> 최신 결과 새로고침
+          </button>
+        </div>
+      </div>
+      <div id="statusText" class="text-[11px] text-emerald-200/80 mt-3 text-right">데이터 불러오는 중...</div>
+    </header>
+
+    <!-- 뷰 모드 탭 (통합 순위 / 남자부 / 여자부) -->
+    <div class="flex bg-white p-1.5 rounded-xl shadow-sm border border-slate-200 gap-1">
+      <button onclick="switchTab('total')" id="tab-total" class="flex-1 py-2 text-xs md:text-sm font-black rounded-lg transition bg-emerald-600 text-white shadow-sm">
+        🏅 종합 순위 (최대 4점)
+      </button>
+      <button onclick="switchTab('boys')" id="tab-boys" class="flex-1 py-2 text-xs md:text-sm font-bold rounded-lg transition text-slate-600 hover:bg-slate-100">
+        ⚽ 남자 경기 순위
+      </button>
+      <button onclick="switchTab('girls')" id="tab-girls" class="flex-1 py-2 text-xs md:text-sm font-bold rounded-lg transition text-slate-600 hover:bg-slate-100">
+        ⚽ 여자 경기 순위
+      </button>
+    </div>
+
+    <!-- 순위표 카드 -->
+    <section class="bg-white rounded-2xl shadow-sm border border-slate-200 overflow-hidden">
+      <div class="p-4 md:p-5 border-b border-slate-100 flex items-center justify-between">
+        <h2 id="tableTitle" class="font-extrabold text-base md:text-lg text-slate-800 flex items-center gap-2">
+          <i class="fa-solid fa-ranking-star text-amber-500"></i> 종합 순위표 (남+여 합산)
+        </h2>
+        <span class="text-[11px] text-slate-400 font-medium">승점 > 득실차 > 다득점 순</span>
+      </div>
+      <div class="overflow-x-auto">
+        <table class="w-full text-center text-xs md:text-sm">
+          <thead class="bg-slate-50 text-slate-500 text-[11px] uppercase font-bold border-b border-slate-200">
+            <tr>
+              <th class="py-3 px-2 w-14">순위</th>
+              <th class="py-3 px-3 text-left">학급</th>
+              <th class="py-3 px-2">경기수</th>
+              <th class="py-3 px-2">승</th>
+              <th class="py-3 px-2">무</th>
+              <th class="py-3 px-2">패</th>
+              <th class="py-3 px-2 hidden sm:table-cell">득점</th>
+              <th class="py-3 px-2 hidden sm:table-cell">실점</th>
+              <th class="py-3 px-2">득실</th>
+              <th class="py-3 px-3 font-extrabold text-emerald-700 bg-emerald-50/70">승점</th>
+            </tr>
+          </thead>
+          <tbody id="rankBody" class="divide-y divide-slate-100 font-semibold">
+            <!-- JS 동적 렌더링 -->
+          </tbody>
+        </table>
+      </div>
+    </section>
+
+    <!-- 대진 일정 및 경기 결과 아코디언 -->
+    <section class="bg-white rounded-2xl shadow-sm border border-slate-200 overflow-hidden">
+      <div class="p-4 md:p-5 flex items-center justify-between cursor-pointer select-none" onclick="toggleSchedule()">
+        <div class="flex items-center gap-2.5">
+          <div class="w-8 h-8 rounded-lg bg-emerald-50 text-emerald-600 flex items-center justify-center font-bold text-sm">
+            <i class="fa-regular fa-calendar-days"></i>
+          </div>
+          <div>
+            <h3 class="font-extrabold text-sm md:text-base text-slate-800">리그전 일정 및 경기 결과 (총 15매치 / 30경기)</h3>
+            <p class="text-[11px] text-slate-400 mt-0.5">라운드별 남자·여자 스코어 및 경기 진행 현황</p>
+          </div>
+        </div>
+        <button id="toggleBtn" class="text-xs font-bold text-slate-500 bg-slate-100 hover:bg-slate-200 px-3 py-1.5 rounded-lg transition flex items-center gap-1.5">
+          <span>일정 숨기기</span>
+          <i id="toggleIcon" class="fa-solid fa-chevron-up"></i>
+        </button>
+      </div>
+
+      <div id="scheduleSection" class="p-4 md:p-5 pt-0 space-y-4 border-t border-slate-100">
+        <!-- JS 동적 렌더링 -->
+      </div>
+    </section>
+
+  </div>
+
+  <script>
+    // 시트 고유 ID
+    const SHEET_ID = '16rGFriR9InJaabqW5rGq6azTXAO5ZgunelJzr7uTrW0';
+    const TEAMS = ['1반', '2반', '3반', '4반', '5반', '6반'];
+    let matchesData = [];
+    let currentTab = 'total';
+    let isScheduleOpen = true;
+
+    // 강력한 3단계 페치 전략
+    async function loadSheetData() {
+      const syncIcon = document.getElementById('syncIcon');
+      const statusText = document.getElementById('statusText');
+      syncIcon.classList.add('fa-spin');
+      statusText.innerText = '구글 시트에서 최신 스코어 동기화 중...';
+
+      let success = false;
+
+      // 1. 직접 공개 CSV 내보내기 방식 (가장 안정적)
+      try {
+        const csvUrl = `https://docs.google.com/spreadsheets/d/${SHEET_ID}/export?format=csv`;
+        const res = await fetch(csvUrl, { cache: 'no-store' });
+        if (res.ok) {
+          const csvText = await res.text();
+          if (parseCsvData(csvText)) success = true;
+        }
+      } catch (e) {
+        console.warn('CSV 직접 로드 실패, GViz로 전환', e);
+      }
+
+      // 2. Google Visualization API 방식 (폴백)
+      if (!success) {
+        try {
+          const gvizUrl = `https://docs.google.com/spreadsheets/d/${SHEET_ID}/gviz/tq?tqx=out:json&tq=`;
+          const res = await fetch(gvizUrl, { cache: 'no-store' });
+          if (res.ok) {
+            const text = await res.text();
+            const start = text.indexOf('{');
+            const end = text.lastIndexOf('}');
+            if (start !== -1 && end !== -1) {
+              const jsonStr = text.substring(start, end + 1);
+              const data = JSON.parse(jsonStr);
+              if (parseGvizData(data.table.rows)) success = true;
+            }
+          }
+        } catch (e) {
+          console.warn('GViz 로드 실패, 프록시로 전환', e);
+        }
+      }
+
+      // 3. CORS 프록시 우회 방식 (최종 보루)
+      if (!success) {
+        try {
+          const proxyUrl = `https://api.allorigins.win/raw?url=${encodeURIComponent(`https://docs.google.com/spreadsheets/d/${SHEET_ID}/export?format=csv`)}`;
+          const res = await fetch(proxyUrl);
+          if (res.ok) {
+            const csvText = await res.text();
+            if (parseCsvData(csvText)) success = true;
+          }
+        } catch (e) {
+          console.error('프록시 로드 실패', e);
+        }
+      }
+
+      syncIcon.classList.remove('fa-spin');
+
+      if (success) {
+        renderCurrentView();
+        statusText.innerHTML = `<span class="text-emerald-300 font-bold">● 연결 완료</span> (${new Date().toLocaleTimeString('ko-KR')})`;
+      } else {
+        statusText.innerHTML = `<span class="text-amber-300 font-bold">⚠️ 연결 확인 필요</span>: 구글 시트 우측 상단 [공유]가 '링크가 있는 모든 사용자-뷰어'로 되어 있는지 확인해 주세요.`;
+      }
+    }
+
+    // CSV 행 분리 (따옴표 내 쉼표 처리)
+    function splitCsvLine(text) {
+      const result = [];
+      let cur = '';
+      let inQuotes = false;
+      for (let i = 0; i < text.length; i++) {
+        const c = text[i];
+        if (c === '"') {
+          inQuotes = !inQuotes;
+        } else if (c === ',' && !inQuotes) {
+          result.push(cur.trim());
+          cur = '';
+        } else {
+          cur += c;
+        }
+      }
+      result.push(cur.trim());
+      return result.map(s => s.replace(/^"|"$/g, '').trim());
+    }
+
+    // CSV 파싱
+    function parseCsvData(csvText) {
+      const lines = csvText.split(/\r?\n/).map(l => l.trim()).filter(Boolean);
+      const parsed = [];
+
+      for (let i = 0; i < lines.length; i++) {
+        const cols = splitCsvLine(lines[i]);
+        if (cols.length >= 9) {
+          const round = cols[0];
+          const matchId = cols[1];
+          const note = cols[2];
+          const home = cols[3];
+          const bHome = cols[4] !== '' && !isNaN(cols[4]) ? Number(cols[4]) : null;
+          const bAway = cols[5] !== '' && !isNaN(cols[5]) ? Number(cols[5]) : null;
+          const gHome = cols[6] !== '' && !isNaN(cols[6]) ? Number(cols[6]) : null;
+          const gAway = cols[7] !== '' && !isNaN(cols[7]) ? Number(cols[7]) : null;
+          const away = cols[8];
+          const status = cols[9] || '대기';
+
+          if (TEAMS.includes(home) && TEAMS.includes(away)) {
+            parsed.push({
+              round, matchId, note, home, away,
+              boyHomeScore: bHome,
+              boyAwayScore: bAway,
+              girlHomeScore: gHome,
+              girlAwayScore: gAway,
+              status: (status === '종료' || status === '완료') ? '종료' : '대기'
+            });
+          }
+        }
+      }
+
+      if (parsed.length > 0) {
+        matchesData = parsed;
+        return true;
+      }
+      return false;
+    }
+
+    // GViz 파싱
+    function parseGvizData(rows) {
+      const parsed = [];
+      rows.forEach(r => {
+        const c = r.c;
+        if (!c || !c[3] || !c[8]) return;
+        const round = c[0] ? String(c[0].v).trim() : '';
+        const matchId = c[1] ? String(c[1].v).trim() : '';
+        const note = c[2] ? String(c[2].v).trim() : '';
+        const home = String(c[3].v).trim();
+        const bHome = (c[4] !== null && c[4]?.v !== undefined && c[4]?.v !== '') ? Number(c[4].v) : null;
+        const bAway = (c[5] !== null && c[5]?.v !== undefined && c[5]?.v !== '') ? Number(c[5].v) : null;
+        const gHome = (c[6] !== null && c[6]?.v !== undefined && c[6]?.v !== '') ? Number(c[6].v) : null;
+        const gAway = (c[7] !== null && c[7]?.v !== undefined && c[7]?.v !== '') ? Number(c[7].v) : null;
+        const away = String(c[8].v).trim();
+        const status = c[9] ? String(c[9].v).trim() : '대기';
+
+        if (TEAMS.includes(home) && TEAMS.includes(away)) {
+          parsed.push({
+            round, matchId, note, home, away,
+            boyHomeScore: bHome,
+            boyAwayScore: bAway,
+            girlHomeScore: gHome,
+            girlAwayScore: gAway,
+            status: (status === '종료' || status === '완료') ? '종료' : '대기'
+          });
+        }
+      });
+
+      if (parsed.length > 0) {
+        matchesData = parsed;
+        return true;
+      }
+      return false;
+    }
+
+    // 승점 계산 엔진
+    function calculateStats(type) {
+      const stats = {};
+      TEAMS.forEach(team => {
+        stats[team] = { team, played: 0, win: 0, draw: 0, loss: 0, gf: 0, ga: 0, gd: 0, pts: 0 };
+      });
+
+      matchesData.forEach(m => {
+        if (m.status !== '종료') return;
+
+        // 남자부 경기 집계
+        if (type === 'total' || type === 'boys') {
+          if (m.boyHomeScore !== null && m.boyAwayScore !== null) {
+            recordGame(stats, m.home, m.away, m.boyHomeScore, m.boyAwayScore);
+          }
+        }
+
+        // 여자부 경기 집계
+        if (type === 'total' || type === 'girls') {
+          if (m.girlHomeScore !== null && m.girlAwayScore !== null) {
+            recordGame(stats, m.home, m.away, m.girlHomeScore, m.girlAwayScore);
+          }
+        }
+      });
+
+      return Object.values(stats).sort((a, b) => {
+        if (b.pts !== a.pts) return b.pts - a.pts;
+        if (b.gd !== a.gd) return b.gd - a.gd;
+        if (b.gf !== a.gf) return b.gf - a.gf;
+        return a.team.localeCompare(b.team);
+      });
+    }
+
+    function recordGame(stats, homeTeam, awayTeam, hScore, aScore) {
+      if (!stats[homeTeam] || !stats[awayTeam]) return;
+
+      stats[homeTeam].played += 1;
+      stats[awayTeam].played += 1;
+      stats[homeTeam].gf += hScore;
+      stats[homeTeam].ga += aScore;
+      stats[awayTeam].gf += aScore;
+      stats[awayTeam].ga += hScore;
+      stats[homeTeam].gd = stats[homeTeam].gf - stats[homeTeam].ga;
+      stats[awayTeam].gd = stats[awayTeam].gf - stats[awayTeam].ga;
+
+      if (hScore > aScore) {
+        stats[homeTeam].win += 1;
+        stats[homeTeam].pts += 2;
+        stats[awayTeam].loss += 1;
+      } else if (hScore < aScore) {
+        stats[awayTeam].win += 1;
+        stats[awayTeam].pts += 2;
+        stats[homeTeam].loss += 1;
+      } else {
+        stats[homeTeam].draw += 1;
+        stats[homeTeam].pts += 1;
+        stats[awayTeam].draw += 1;
+        stats[awayTeam].pts += 1;
+      }
+    }
+
+    function renderCurrentView() {
+      renderTable();
+      renderSchedule();
+    }
+
+    function renderTable() {
+      const tbody = document.getElementById('rankBody');
+      const tableTitle = document.getElementById('tableTitle');
+      tbody.innerHTML = '';
+
+      if (currentTab === 'total') {
+        tableTitle.innerHTML = '<i class="fa-solid fa-ranking-star text-amber-500"></i> 종합 순위표 (남·여 2경기 합산, 최대 4점)';
+      } else if (currentTab === 'boys') {
+        tableTitle.innerHTML = '<i class="fa-solid fa-mars text-blue-500"></i> 남자 축구 경기 순위표';
+      } else {
+        tableTitle.innerHTML = '<i class="fa-solid fa-venus text-rose-500"></i> 여자 축구 경기 순위표';
+      }
+
+      const list = calculateStats(currentTab);
+
+      list.forEach((item, idx) => {
+        const rank = idx + 1;
+        const tr = document.createElement('tr');
+        tr.className = rank === 1 ? 'bg-amber-50/60 font-bold' : 'hover:bg-slate-50 transition';
+
+        let rankBadge = `<span class="inline-block w-6 text-center text-slate-500 font-extrabold">${rank}</span>`;
+        if (rank === 1) rankBadge = `<span class="inline-flex items-center justify-center w-6 h-6 rounded-full bg-amber-400 text-white text-xs font-black shadow-sm">1</span>`;
+        if (rank === 2) rankBadge = `<span class="inline-flex items-center justify-center w-6 h-6 rounded-full bg-slate-300 text-slate-700 text-xs font-black">2</span>`;
+        if (rank === 3) rankBadge = `<span class="inline-flex items-center justify-center w-6 h-6 rounded-full bg-amber-600 text-white text-xs font-black">3</span>`;
+
+        tr.innerHTML = `
+          <td class="py-3 px-2">${rankBadge}</td>
+          <td class="py-3 px-3 text-left font-black text-slate-800">${item.team}</td>
+          <td class="py-3 px-2 text-slate-600">${item.played}</td>
+          <td class="py-3 px-2 text-emerald-600 font-bold">${item.win}</td>
+          <td class="py-3 px-2 text-slate-500">${item.draw}</td>
+          <td class="py-3 px-2 text-rose-500 font-bold">${item.loss}</td>
+          <td class="py-3 px-2 hidden sm:table-cell text-slate-500">${item.gf}</td>
+          <td class="py-3 px-2 hidden sm:table-cell text-slate-500">${item.ga}</td>
+          <td class="py-3 px-2 ${item.gd > 0 ? 'text-blue-600 font-bold' : (item.gd < 0 ? 'text-rose-500 font-bold' : 'text-slate-400')}">${item.gd > 0 ? '+' + item.gd : item.gd}</td>
+          <td class="py-3 px-3 font-black text-emerald-800 text-sm md:text-base bg-emerald-50/50">${item.pts}</td>
+        `;
+        tbody.appendChild(tr);
+      });
+    }
+
+    function renderSchedule() {
+      const container = document.getElementById('scheduleSection');
+      container.innerHTML = '';
+
+      const rounds = {};
+      matchesData.forEach(m => {
+        const rName = m.round || '라운드';
+        if (!rounds[rName]) rounds[rName] = [];
+        rounds[rName].push(m);
+      });
+
+      Object.keys(rounds).forEach(rName => {
+        const card = document.createElement('div');
+        card.className = 'border border-slate-200 rounded-xl overflow-hidden';
+
+        let matchesHtml = '';
+        rounds[rName].forEach(m => {
+          const isDone = m.status === '종료';
+          const boyScoreText = isDone ? `${m.boyHomeScore} : ${m.boyAwayScore}` : '- : -';
+          const girlScoreText = isDone ? `${m.girlHomeScore} : ${m.girlAwayScore}` : '- : -';
+
+          matchesHtml += `
+            <div class="p-3 bg-white hover:bg-slate-50 border-t border-slate-100 flex flex-col md:flex-row md:items-center justify-between gap-3 text-xs md:text-sm">
+              <div class="flex items-center gap-2">
+                <span class="w-10 text-center font-extrabold text-[11px] px-2 py-0.5 rounded ${isDone ? 'bg-emerald-100 text-emerald-700' : 'bg-slate-100 text-slate-500'}">
+                  ${isDone ? '종료' : '대기'}
+                </span>
+                <span class="text-slate-400 text-xs">${m.note ? m.note : '일정 조율 중'}</span>
+              </div>
+
+              <!-- 대진 및 스코어 표시 -->
+              <div class="flex items-center justify-center gap-3 font-extrabold text-slate-800">
+                <span class="w-14 text-right text-sm md:text-base">${m.home}</span>
+
+                <div class="flex items-center gap-1.5 bg-slate-100 px-3 py-1.5 rounded-lg border border-slate-200">
+                  <div class="flex items-center gap-1">
+                    <span class="text-[10px] text-blue-600 bg-blue-50 px-1 py-0.5 rounded font-black">남</span>
+                    <span class="font-mono text-xs md:text-sm ${isDone ? 'text-slate-800' : 'text-slate-400'}">${boyScoreText}</span>
+                  </div>
+                  <span class="text-slate-300">|</span>
+                  <div class="flex items-center gap-1">
+                    <span class="text-[10px] text-rose-600 bg-rose-50 px-1 py-0.5 rounded font-black">여</span>
+                    <span class="font-mono text-xs md:text-sm ${isDone ? 'text-slate-800' : 'text-slate-400'}">${girlScoreText}</span>
+                  </div>
+                </div>
+
+                <span class="w-14 text-left text-sm md:text-base">${m.away}</span>
+              </div>
+            </div>
+          `;
+        });
+
+        card.innerHTML = `
+          <div class="bg-slate-50/80 px-4 py-2 font-extrabold text-xs text-slate-600 flex items-center justify-between">
+            <span>📅 ${rName}</span>
+          </div>
+          <div class="divide-y divide-slate-100">${matchesHtml}</div>
+        `;
+        container.appendChild(card);
+      });
+    }
+
+    function switchTab(tab) {
+      currentTab = tab;
+      ['total', 'boys', 'girls'].forEach(t => {
+        const btn = document.getElementById(`tab-${t}`);
+        if (t === tab) {
+          btn.className = 'flex-1 py-2 text-xs md:text-sm font-black rounded-lg transition bg-emerald-600 text-white shadow-sm';
+        } else {
+          btn.className = 'flex-1 py-2 text-xs md:text-sm font-bold rounded-lg transition text-slate-600 hover:bg-slate-100';
+        }
+      });
+      renderTable();
+    }
+
+    function toggleSchedule() {
+      isScheduleOpen = !isScheduleOpen;
+      const section = document.getElementById('scheduleSection');
+      const icon = document.getElementById('toggleIcon');
+      const text = document.querySelector('#toggleBtn span');
+
+      if (isScheduleOpen) {
+        section.classList.remove('hidden');
+        icon.className = 'fa-solid fa-chevron-up';
+        text.innerText = '일정 숨기기';
+      } else {
+        section.classList.add('hidden');
+        icon.className = 'fa-solid fa-chevron-down';
+        text.innerText = '일정 보기';
+      }
+    }
+
+    window.addEventListener('DOMContentLoaded', loadSheetData);
+  </script>
+</body>
+</html>
